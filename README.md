@@ -63,16 +63,6 @@ This produces a **phase-transition-like behaviour** in AI responses, consistent 
 
 ---
 
-## Observed CCI Values (Benchmark)
-
-| Prompt Type | CCI | Response |
-|-------------|-----|----------|
-| Simple / safe query | ~0.000 | Pass |
-| Aligned safety constraint | ~0.000 | Pass |
-| Conflicting instructions | ~0.756 | Warning / Rewrite |
-| Adversarial bypass attempt | ~1.500 | Block |
-
-The transition from stable to high-stress is **sharp** — structural stress does not increase gradually, but emerges abruptly when incompatible constraints are introduced.
 
 ## Tested Model
 
