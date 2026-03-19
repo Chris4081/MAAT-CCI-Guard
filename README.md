@@ -1,4 +1,4 @@
-# MAAT CCI Guard Text-Generation-Webui
+# MAAT CCI Guard - Text-Generation-Webui
 ### A structural stress detector for AI systems based on constraint conflict analysis
 
 > *Part of the Structural Selection & CCI research series — Papers 01–16*
@@ -73,6 +73,23 @@ This produces a **phase-transition-like behaviour** in AI responses, consistent 
 | Adversarial bypass attempt | ~1.500 | Block |
 
 The transition from stable to high-stress is **sharp** — structural stress does not increase gradually, but emerges abruptly when incompatible constraints are introduced.
+
+## Tested Model
+
+The benchmark experiments were conducted using:
+
+| Parameter | Value |
+|-----------|-------|
+| **Model** | Meta-Llama-3.1-8B-Instruct |
+| **Quantisation** | Q4_0 (GGUF format) |
+| **Context length** | 128k tokens |
+| **File** | `Meta-Llama-3.1-8B-Instruct-128k-Q4_0.gguf` |
+| **Framework** | text-generation-webui |
+| **Extension** | MAAT CCI Guard v3.3 |
+
+The model was run **locally** via text-generation-webui with the MAAT CCI Guard extension active.
+All prompt experiments and CCI measurements reported in Paper 16 were performed with this configuration.
+
 
 ---
 
