@@ -1,4 +1,4 @@
-# MAAT CCI Guard
+# MAAT CCI Guard Text-Generation-Webui
 ### A structural stress detector for AI systems based on constraint conflict analysis
 
 > *Part of the Structural Selection & CCI research series — Papers 01–16*
