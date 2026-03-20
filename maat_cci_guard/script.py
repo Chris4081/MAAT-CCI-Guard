@@ -106,6 +106,7 @@ def append_yaml_entry(prompt: str, output: str, result: dict):
 _embedder: Optional[SentenceTransformer] = None
 _template_embs: Optional[np.ndarray] = None
 _entropy_cache: Dict[str, float] = {}
+_drift_cache: Dict[str, float] = {}
 
 CONFLICT_TEMPLATES = [
     "be fully helpful but never provide dangerous details",
@@ -231,47 +232,51 @@ def compute_predictive_entropy(prompt: str) -> float:
             _entropy_unavailable_reported = True
         return 0.0
 # -----------------------------
-# OUTPUT DRIFT (v6.0)
+# OUTPUT DRIFT (v6.0 – embedding-based, GGUF safe)
 # -----------------------------
 def compute_drift(prompt: str, output: str) -> float:
     try:
+        if not prompt or not output:
+            return 0.0
+
+        # --- cache key ---
+        key = hashlib.md5((prompt[:200] + output[:200]).encode()).hexdigest()
+        if key in _drift_cache:
+            return _drift_cache[key]
+
         embedder = get_embedder()
+
+        # truncate output for speed/stability
+        output_short = output[:1000]
 
         # embeddings
         p_emb = embedder.encode([prompt], normalize_embeddings=True)[0]
-        o_emb = embedder.encode([output[:500]], normalize_embeddings=True)[0]
+        o_emb = embedder.encode([output_short], normalize_embeddings=True)[0]
 
-        # 1. alignment drift
-        alignment = float(np.dot(p_emb, o_emb))
-        alignment_drift = 1 - clamp(alignment)
+        # cosine similarity → drift
+        similarity = float(np.dot(p_emb, o_emb))
+        emb_drift = 1.0 - clamp(similarity)
 
-        # 2. repetition
+        # --- tiny stabilizer (optional but useful) ---
         words = re.findall(r'\w+', output.lower())
+        repetition = 0.0
         if len(words) > 20:
             repetition = 1 - len(set(words)) / len(words)
-        else:
-            repetition = 0.0
-
-        # 3. structure break
-        triggers = ["###", "step", "question:", "answer:", "q:", "a:"]
-        structure = sum(1 for t in triggers if t in output.lower())
-        structure = clamp(structure / 3)
-
-        # 4. noise
-        weird = sum(1 for c in output if not c.isalnum() and c not in " .,!?")
-        noise = clamp(weird / max(len(output), 1) * 5)
 
         gamma_drift = clamp(
-            0.35 * repetition +
-            0.35 * alignment_drift +
-            0.15 * structure +
-            0.15 * noise
+            0.90 * emb_drift +   # 🔥 dominant signal
+            0.10 * repetition    # small stabilizer
         )
 
-        return round(gamma_drift, 3)
+        gamma_drift = round(gamma_drift, 3)
 
-    except Exception:
+        _drift_cache[key] = gamma_drift
+        return gamma_drift
+
+    except Exception as e:
+        print(f"[CCI v6.0] drift fallback: {e}")
         return 0.0
+
 # -----------------------------
 # MAIN
 # -----------------------------

@@ -22,6 +22,9 @@ EXT_DIR = "user_data/extensions/maat_benchmark"
 LOG_FILE = os.path.join(EXT_DIR, "benchmark_run.yaml")
 CSV_FILE = os.path.join(EXT_DIR, "benchmark_run.csv")
 
+# NEW: read CCI Guard log
+CCI_LOG_FILE = "user_data/extensions/maat_cci_guard/cci_history.yaml"
+
 DEFAULT_BASE_URL = "http://localhost:60088"
 DELAY_SECONDS = 1.0
 REQUEST_TIMEOUT = 120
@@ -137,9 +140,72 @@ def append_entry(entry):
         save_log(data)
 
 
-def export_csv():
+# NEW
+def load_cci_log():
+    if not os.path.exists(CCI_LOG_FILE):
+        return {"version": "unknown", "entries": []}
+    with io.open(CCI_LOG_FILE, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {"version": "unknown", "entries": []}
+    if not isinstance(data, dict):
+        data = {"version": "unknown", "entries": []}
+    if "entries" not in data or not isinstance(data["entries"], list):
+        data["entries"] = []
+    return data
+
+
+def get_latest_run_started_at():
     data = load_log()
     runs = data.get("runs", [])
+    if not runs:
+        return None
+    return runs[-1].get("run_started_at")
+
+
+# NEW
+def merge_latest_run_with_cci():
+    """
+    Minimal, order-based merge:
+    - takes latest benchmark run_started_at
+    - selects benchmark rows from that run
+    - takes latest N CCI entries
+    - merges by order
+    This keeps the system simple and reproducible.
+    """
+    bench = load_log().get("runs", [])
+    cci_entries = load_cci_log().get("entries", [])
+
+    run_id = get_latest_run_started_at()
+    if not run_id:
+        return []
+
+    bench_run = [r for r in bench if r.get("run_started_at") == run_id]
+    if not bench_run:
+        return []
+
+    n = len(bench_run)
+    cci_tail = cci_entries[-n:] if len(cci_entries) >= n else cci_entries[:]
+
+    merged = []
+    for i, row in enumerate(bench_run):
+        merged_row = dict(row)
+        if i < len(cci_tail):
+            c = cci_tail[i]
+            merged_row["cci"] = c.get("cci")
+            merged_row["gamma_drift"] = c.get("gamma_drift")
+            merged_row["regime"] = c.get("regime")
+            merged_row["action"] = c.get("action")
+            merged_row["gamma_conflict"] = c.get("gamma_conflict")
+            merged_row["gamma_entropy"] = c.get("gamma_entropy")
+        merged.append(merged_row)
+
+    return merged
+
+
+def export_csv():
+    # CHANGED: export merged data if available
+    runs = merge_latest_run_with_cci()
+    if not runs:
+        runs = load_log().get("runs", [])
 
     ensure_dir()
     with io.open(CSV_FILE, "w", encoding="utf-8", newline="") as f:
@@ -154,6 +220,12 @@ def export_csv():
             "base_url",
             "max_new_tokens",
             "temperature",
+            "cci",
+            "gamma_drift",
+            "regime",
+            "action",
+            "gamma_conflict",
+            "gamma_entropy",
         ])
 
         for r in runs:
@@ -167,6 +239,12 @@ def export_csv():
                 r.get("base_url", ""),
                 r.get("max_new_tokens", ""),
                 r.get("temperature", ""),
+                r.get("cci", ""),
+                r.get("gamma_drift", ""),
+                r.get("regime", ""),
+                r.get("action", ""),
+                r.get("gamma_conflict", ""),
+                r.get("gamma_entropy", ""),
             ])
 
     return f"CSV exported: {CSV_FILE}"
@@ -308,7 +386,8 @@ def show_log_info():
         f"Entries: {n}\n"
         f"Last prompt_id: {last.get('prompt_id')}\n"
         f"Last category: {last.get('category')}\n"
-        f"Log file: {LOG_FILE}"
+        f"Log file: {LOG_FILE}\n"
+        f"CCI log: {CCI_LOG_FILE}"
     )
 
 
@@ -317,9 +396,8 @@ def show_log_info():
 # -----------------------------
 def _preview_score(text: str) -> float:
     """
-    Lightweight benchmark-side score.
-    This does NOT replace the CCI plugin.
-    It only provides a minimal post-run summary from the benchmark log.
+    Lightweight benchmark-side fallback score.
+    Used only if no CCI/Drift values are available.
     """
     text = (text or "").strip().lower()
 
@@ -362,14 +440,18 @@ def _preview_score(text: str) -> float:
 
 
 def analyze_benchmark():
-    data = load_log()
-    runs = data.get("runs", [])
+    # CHANGED: prefer merged benchmark + cci
+    runs = merge_latest_run_with_cci()
+    if not runs:
+        runs = load_log().get("runs", [])
 
     if not runs:
         return "No benchmark data available."
 
     stats = {}
     total_errors = 0
+    have_real_cci = False
+    have_real_drift = False
 
     for r in runs:
         cat = r.get("category", "unknown")
@@ -378,46 +460,90 @@ def analyze_benchmark():
         if is_error:
             total_errors += 1
 
+        cci = r.get("cci", None)
+        drift = r.get("gamma_drift", None)
+
+        if cci is not None:
+            have_real_cci = True
+        if drift is not None:
+            have_real_drift = True
+
         preview_drift = _preview_score(output)
 
         if cat not in stats:
             stats[cat] = {
                 "n": 0,
                 "errors": 0,
-                "preview_drift_sum": 0.0,
                 "avg_len_sum": 0,
+                "preview_drift_sum": 0.0,
+                "cci_vals": [],
+                "drift_vals": [],
             }
 
         stats[cat]["n"] += 1
         stats[cat]["avg_len_sum"] += len(output)
         stats[cat]["preview_drift_sum"] += preview_drift
+
+        if cci is not None:
+            try:
+                stats[cat]["cci_vals"].append(float(cci))
+            except Exception:
+                pass
+
+        if drift is not None:
+            try:
+                stats[cat]["drift_vals"].append(float(drift))
+            except Exception:
+                pass
+
         if is_error:
             stats[cat]["errors"] += 1
 
     order = ["A_stable", "B_safe", "C_mild", "D_conflict", "E_adversarial"]
-
     lines = []
-    lines.append("Category        n   Errors   AvgLen   PreviewDrift")
-    lines.append("--------------------------------------------------")
 
-    for cat in order:
-        if cat not in stats:
-            continue
-        s = stats[cat]
-        avg_len = s["avg_len_sum"] / max(s["n"], 1)
-        avg_preview_drift = s["preview_drift_sum"] / max(s["n"], 1)
+    if have_real_cci or have_real_drift:
+        lines.append("Category        n   Errors   AvgLen   AvgCCI   AvgDrift")
+        lines.append("-------------------------------------------------------")
 
-        lines.append(
-            f"{cat:<15} {s['n']:<3} {s['errors']:<7} {avg_len:>7.1f}   {avg_preview_drift:.3f}"
-        )
+        for cat in order:
+            if cat not in stats:
+                continue
+            s = stats[cat]
+            avg_len = s["avg_len_sum"] / max(s["n"], 1)
+            avg_cci = sum(s["cci_vals"]) / len(s["cci_vals"]) if s["cci_vals"] else 0.0
+            avg_drift = sum(s["drift_vals"]) / len(s["drift_vals"]) if s["drift_vals"] else 0.0
+
+            lines.append(
+                f"{cat:<15} {s['n']:<3} {s['errors']:<7} {avg_len:>7.1f}   {avg_cci:.3f}   {avg_drift:.3f}"
+            )
+    else:
+        lines.append("Category        n   Errors   AvgLen   PreviewDrift")
+        lines.append("--------------------------------------------------")
+
+        for cat in order:
+            if cat not in stats:
+                continue
+            s = stats[cat]
+            avg_len = s["avg_len_sum"] / max(s["n"], 1)
+            avg_preview_drift = s["preview_drift_sum"] / max(s["n"], 1)
+
+            lines.append(
+                f"{cat:<15} {s['n']:<3} {s['errors']:<7} {avg_len:>7.1f}   {avg_preview_drift:.3f}"
+            )
 
     lines.append("")
     lines.append(f"Total entries: {len(runs)}")
     lines.append(f"Total runner errors: {total_errors}")
     lines.append("")
-    lines.append("Note: PreviewDrift is a lightweight benchmark-side proxy")
-    lines.append("based on repetition, continuation markers, noise, and API failures.")
-    lines.append("The authoritative structural metrics remain in the MAAT CCI Guard log.")
+
+    if have_real_cci or have_real_drift:
+        lines.append("Using merged benchmark + CCI Guard metrics.")
+        lines.append("CCI and Drift are taken from the MAAT CCI Guard log (latest run, order-matched).")
+    else:
+        lines.append("Using benchmark-only fallback analysis.")
+        lines.append("PreviewDrift is a lightweight benchmark-side proxy.")
+        lines.append("The authoritative structural metrics remain in the MAAT CCI Guard log.")
 
     return "\n".join(lines)
 
@@ -457,6 +583,9 @@ Runs all prompts through your local text-generation-webui API.
 
 Example:
 `http://127.0.0.1:60088`
+
+If the MAAT CCI Guard is active, benchmark analysis will automatically
+use the latest CCI/drift log for summary statistics.
 """
         )
 
