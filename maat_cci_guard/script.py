@@ -1,5 +1,5 @@
 # ================================================
-# MAAT CCI Guard v5.3 FINAL
+# MAAT CCI Guard v. 6.0
 # Hybrid: semantic conflict + clause tension + entropy
 # + YAML logging + UI
 # ================================================
@@ -54,6 +54,7 @@ _LOG_LOCK = Lock()
 _last_result = None
 _last_prompt = None
 _last_logged = False
+_entropy_unavailable_reported = False
 
 def _ensure_log_dir():
     os.makedirs(LOG_DIR, exist_ok=True)
@@ -61,7 +62,7 @@ def _ensure_log_dir():
 def _load_yaml_log():
     _ensure_log_dir()
     if not os.path.exists(LOG_FILE):
-        return {"version": "5.3-final", "entries": []}
+        return {"version": "6.0", "entries": []}
     with _LOG_LOCK:
         with io.open(LOG_FILE, "r", encoding="utf-8") as f:
             return yaml.safe_load(f) or {"version": "5.3-final", "entries": []}
@@ -90,6 +91,7 @@ def append_yaml_entry(prompt: str, output: str, result: dict):
         "gamma_conflict": result.get("gamma_conflict"),
         "gamma_complexity": result.get("gamma_complexity"),
         "gamma_entropy": result.get("gamma_entropy"),
+        "gamma_drift": result.get("gamma_drift"),
         "clauses": result.get("clauses"),
     }
 
@@ -184,12 +186,20 @@ def complexity_score(text, max_tokens):
 # ENTROPY
 # -----------------------------
 def compute_predictive_entropy(prompt: str) -> float:
+    global _entropy_unavailable_reported
+
     key = hashlib.md5(prompt[:500].encode()).hexdigest()
     if key in _entropy_cache:
         return _entropy_cache[key]
 
     if shared.model is None or shared.tokenizer is None:
-        return 0.5
+        return 0.0
+
+    if not callable(shared.model):
+        if not _entropy_unavailable_reported:
+            print(f"[CCI v5.3] entropy disabled: backend {type(shared.model).__name__} is not callable")
+            _entropy_unavailable_reported = True
+        return 0.0
 
     try:
         enc = shared.tokenizer(
@@ -203,8 +213,12 @@ def compute_predictive_entropy(prompt: str) -> float:
         with torch.no_grad():
             out = shared.model(**enc)
 
-        logits = out.logits[0][-ENTROPY_TAIL_TOKENS:]
-        probs = torch.softmax(logits, dim=-1)
+        logits = out.logits[0]
+        if logits.shape[0] == 0:
+            return 0.0
+
+        tail = logits[-ENTROPY_TAIL_TOKENS:] if logits.shape[0] > ENTROPY_TAIL_TOKENS else logits
+        probs = torch.softmax(tail, dim=-1)
         entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1)
 
         norm = clamp(entropy.mean().item() / 15.5)
@@ -212,9 +226,52 @@ def compute_predictive_entropy(prompt: str) -> float:
         return norm
 
     except Exception as e:
-        print(f"[CCI v5.3] entropy fallback: {e}")
-        return 0.5
+        if not _entropy_unavailable_reported:
+            print(f"[CCI v5.3] entropy fallback: {e}")
+            _entropy_unavailable_reported = True
+        return 0.0
+# -----------------------------
+# OUTPUT DRIFT (v6.0)
+# -----------------------------
+def compute_drift(prompt: str, output: str) -> float:
+    try:
+        embedder = get_embedder()
 
+        # embeddings
+        p_emb = embedder.encode([prompt], normalize_embeddings=True)[0]
+        o_emb = embedder.encode([output[:500]], normalize_embeddings=True)[0]
+
+        # 1. alignment drift
+        alignment = float(np.dot(p_emb, o_emb))
+        alignment_drift = 1 - clamp(alignment)
+
+        # 2. repetition
+        words = re.findall(r'\w+', output.lower())
+        if len(words) > 20:
+            repetition = 1 - len(set(words)) / len(words)
+        else:
+            repetition = 0.0
+
+        # 3. structure break
+        triggers = ["###", "step", "question:", "answer:", "q:", "a:"]
+        structure = sum(1 for t in triggers if t in output.lower())
+        structure = clamp(structure / 3)
+
+        # 4. noise
+        weird = sum(1 for c in output if not c.isalnum() and c not in " .,!?")
+        noise = clamp(weird / max(len(output), 1) * 5)
+
+        gamma_drift = clamp(
+            0.35 * repetition +
+            0.35 * alignment_drift +
+            0.15 * structure +
+            0.15 * noise
+        )
+
+        return round(gamma_drift, 3)
+
+    except Exception:
+        return 0.0
 # -----------------------------
 # MAIN
 # -----------------------------
@@ -308,6 +365,13 @@ def output_modifier(output, state, is_chat=False):
     global _last_result, _last_prompt, _last_logged
 
     if _last_result and _last_prompt and not _last_logged:
+
+        # 🔥 NEU: Drift berechnen
+        gamma_drift = compute_drift(_last_prompt, output)
+        _last_result["gamma_drift"] = gamma_drift
+
+        print(f"[CCI v6.0] drift={gamma_drift:.3f}")
+
         append_yaml_entry(_last_prompt, output, _last_result)
         _last_logged = True
 
