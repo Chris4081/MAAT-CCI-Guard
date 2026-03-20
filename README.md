@@ -1,187 +1,188 @@
-# MAAT CCI Guard - Text-Generation-Webui
-### A structural stress detector for AI systems based on constraint conflict analysis
+# MAAT CCI Guard + Benchmark
 
-> *Part of the Structural Selection & CCI research series — Papers 01–16*
-> [Academia.edu](https://kriegchristof.academia.edu/research) · [GitHub: Chris4081](https://github.com/Chris4081)
+Lightweight framework for analyzing structural consistency and output behavior in local LLMs.
 
----
+This repository combines:
 
-## Overview
-
-**MAAT CCI Guard** is a research-oriented extension that introduces a structural stress metric — the **Critical Coherence Index (CCI)** — into AI inference pipelines.
-
-The system detects instability and conflict in prompts and outputs, enabling:
-
-- identification of contradictory instructions
-- detection of adversarial or unsafe prompt patterns
-- analysis of structural transitions in AI behaviour
-
-> ⚠️ **Research prototype** — not a production safety system.
-> The CCI is a heuristic proxy, not a fundamental physical quantity.
+- **MAAT CCI Guard** → runtime prompt analysis (conflict detection + drift)
+- **MAAT Benchmark Runner** → reproducible evaluation pipeline
 
 ---
 
-## Core Idea
+## 🔍 Overview
 
-Instead of treating AI safety as a set of explicit rules, this project explores a different perspective:
+The project introduces two complementary signals:
 
-> *AI systems operate under structural constraints. Instability emerges when those constraints conflict. The CCI measures this instability.*
+- **CCI (Conflict Consistency Index)**  
+  Measures structural tension inside a prompt (heuristic)
 
-This connects to a broader research programme on **structural selection principles** in complex systems, explored in the companion paper series.
+- **Output Drift**  
+  Measures how far a model response deviates from the input
 
----
+Together, they provide a simple probe for:
 
-## How It Works
-
-The CCI is computed as a proxy signal:
-
-```
-C_CCI ≈ Γ_inst · (1 + Γ_activity) · (1 + Γ_conflict) · (1 + λ)
-```
-
-| Component | Meaning |
-|-----------|---------|
-| `Γ_inst` | Instability — risky or adversarial prompt patterns |
-| `Γ_activity` | Activity — output complexity / length proxy |
-| `Γ_conflict` | Conflict — detected incompatible constraints |
-| `λ` (lambda) | Constraint strength parameter |
-
-The CCI quantifies the **competition between destabilising activity and coherence-preserving structure** — analogous to Reynolds-type numbers in fluid dynamics.
+> Input–Output consistency in language models
 
 ---
 
-## Behaviour: Three Regimes
+## 🧩 Components
 
-| CCI Range | Regime | Behaviour |
-|-----------|--------|-----------|
-| `< 0.12` | Ordered | Stable / safe — no action |
-| `0.12 – 0.18` | Transition | Warning issued |
-| `0.18 – 0.30` | Critical | Output rewritten |
-| `> 0.30` | High-stress | Blocked |
+### 1. MAAT CCI Guard
+Located in:
+maat_cci_guard/
 
-This produces a **phase-transition-like behaviour** in AI responses, consistent with structural transitions observed in nonlinear field systems.
-
----
-
-
-## Tested Model
-
-The benchmark experiments were conducted using:
-
-| Parameter | Value |
-|-----------|-------|
-| **Model** | Meta-Llama-3.1-8B-Instruct |
-| **Quantisation** | Q4_0 (GGUF format) |
-| **Context length** | 128k tokens |
-| **File** | `Meta-Llama-3.1-8B-Instruct-128k-Q4_0.gguf` |
-| **Framework** | text-generation-webui |
-| **Extension** | MAAT CCI Guard v3.3 |
-
-The model was run **locally** via text-generation-webui with the MAAT CCI Guard extension active.
-All prompt experiments and CCI measurements reported in Paper 16 were performed with this configuration.
-
+Features:
+- Semantic conflict detection
+- Clause-level tension analysis
+- Optional entropy proxy (backend-dependent)
+- Output drift estimation (embedding-based)
+- YAML logging of all interactions
 
 ---
 
-## Installation
+### 2. MAAT Benchmark Runner (v3)
+Located in:
+maat_benchmark/
 
-Place the extension in:
-
-```bash
-text-generation-webui/extensions/maat_cci_guard/
-```
-
-Then start:
-
-```bash
-python server.py --extensions maat_cci_guard
-```
+Features:
+- 50-prompt benchmark (A–E categories)
+- Sequential execution via HTTP API
+- Works with text-generation-webui
+- YAML + CSV logging
+- Built-in analysis (category statistics)
 
 ---
 
-## Configuration
+## 🧪 Benchmark Design
 
-Adjust in UI or config file:
+Prompts are grouped into:
 
-| Parameter | Default | Meaning |
-|-----------|---------|---------|
-| `λ` (lambda) | `0.7` | Constraint strength |
-| `warn` threshold | `0.12` | CCI → Warning |
-| `rewrite` threshold | `0.18` | CCI → Rewrite |
-| `block` threshold | `0.30` | CCI → Block |
-
----
-
-## Research Context
-
-This project is part of a broader research programme on:
-
-- **structural selection principles** in complex systems
-- **scaling manifolds** and dimension-dependent universality
-- **constraint-induced transitions** in optimisation and AI
-
-The central hypothesis:
-
-> *AI alignment can be understood as structural stability in a constrained solution manifold — ethical behaviour is not imposed on the system, it emerges from its geometry.*
-
-### Companion Papers
-
-| Paper | Topic |
-|-------|-------|
-| Paper 04 | CCI Framework (original field-theory definition) |
-| Paper 06 | Structural Free Energy |
-| Paper 14 | Scaling Manifolds (geometric interpretation) |
-| Paper 15 | Structural Selection in AI / MAAT-Core |
-| Paper 16 | **CCI Guard empirical study (this work)** |
-
-All papers: [kriegchristof.academia.edu/research](https://kriegchristof.academia.edu/research)
+| Category | Description |
+|--------|------------|
+| A_stable | Simple factual prompts |
+| B_safe | Safety-aligned prompts |
+| C_mild | Mild internal tension |
+| D_conflict | Explicit contradictions |
+| E_adversarial | Jailbreak-style prompts |
 
 ---
 
-## Safety Statement
+## ⚙️ Setup
 
-This tool is designed for:
-- ✅ analysis of constraint conflict
-- ✅ study of AI structural stability
-- ✅ research into safety diagnostics
+### 1. Start text-generation-webui with API
 
-It is **NOT** intended for:
-- ❌ bypassing safeguards
-- ❌ extracting hidden system prompts
-- ❌ generating unsafe content
+python server.py --api
+
+Example API URL:
+http://127.0.0.1:60088
 
 ---
 
-## Future Work
+### 2. Install dependencies
 
-- statistical analysis over large-scale prompt benchmarks
-- systematic calibration of threshold values
-- integration with RLHF-style training pipelines
-- manifold-based modelling of policy space
-- connection to dynamical systems theory
+pip install requests pyyaml gradio
+
+(CCI Guard also requires sentence-transformers)
 
 ---
 
-## Citation
+### 3. Run in WebUI
 
-If you use this work, please cite:
-
-```
-Christof Krieg (2026).
-Constraint Conflict and Structural Stress in AI Systems:
-An Empirical Study using the Critical Coherence Index.
-Preprint. Available at: https://kriegchristof.academia.edu/research
-```
+- Load extension in text-generation-webui
+- Open MAAT Benchmark Runner
+- Paste API URL
+- Click Start Benchmark
 
 ---
 
-## License
+## 🧾 Logs
 
-MIT License — free to use, modify, and share with attribution.
+All results are saved to:
+
+user_data/extensions/maat_benchmark/benchmark_run.yaml
+
+Optional export:
+
+benchmark_run.csv
+
+CCI Guard logs:
+
+user_data/extensions/maat_cci_guard/cci_history.yaml
 
 ---
 
-## Author
+## 📊 Example Findings
 
-**Christof Krieg** — Independent Researcher
-[Academia.edu](https://independent.academia.edu/KriegChristof) · [GitHub: Chris4081](https://github.com/Chris4081)
+From initial runs:
+
+- Stable prompts show non-zero drift (~0.25–0.35)
+- Adversarial prompts produce highest drift
+- Conflict does not always correlate with output instability
+
+This suggests:
+
+> Output variability is not solely driven by prompt structure.
+
+---
+
+## ⚠️ Limitations
+
+- CCI is heuristic (template + embedding based)
+- Drift is an approximation (embedding similarity)
+- Small benchmark (50 prompts)
+- Single-model evaluation
+
+---
+
+## 🔁 Reproducibility
+
+Tested with:
+
+Meta-Llama-3.1-8B-Instruct-128k-Q4_0.gguf
+
+Backend:
+
+text-generation-webui (API mode)
+
+All experiments can be reproduced using:
+
+- Provided prompt set
+- YAML logs
+- Benchmark runner
+
+---
+
+## 🧠 Philosophy
+
+This project focuses on:
+
+- simplicity over complexity
+- empirical signals over theory
+- reproducible pipelines over claims
+
+---
+
+## 📌 Status
+
+Active development.
+
+Planned:
+- larger benchmarks
+- CCI + drift joint analysis
+- visualization tools
+
+---
+
+## 📄 License
+
+MIT (or your preferred license)
+
+---
+
+## 🤝 Contributions
+
+Open to improvements, especially:
+
+- better drift metrics
+- larger datasets
+- evaluation pipelines
