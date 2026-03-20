@@ -1,4 +1,4 @@
-# MAAT CCI Guard + Benchmark
+# MAAT CCI Guard + Benchmark - text generation web ui
 
 Lightweight framework for analyzing structural consistency and output behavior in local LLMs.
 
