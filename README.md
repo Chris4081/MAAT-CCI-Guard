@@ -37,14 +37,14 @@ Stability is computed as: `min(R, (H·B·S·V)^0.25)`
 ### Installation
 
 ```bash
-# 1. Copy the plugin folder into your extensions directory
-cp -r maat/ user_data/extensions/maat_textgenplugin/
+# 1. Copy the "maat" plugin folder into your extensions directory
+cp -r maat/ user_data/extensions/
 
 # 2. Install dependencies (already covered if you have the benchmark)
 pip install requests pyyaml gradio sentence-transformers
 
 # 3. Start text-generation-webui
-python server.py --extensions maat_textgenplugin
+python server.py --extensions maat
 ```
 
 ### Plugin folder structure
