@@ -1,0 +1,126 @@
+enabled: true
+debug: false
+ui_simple_mode: false
+preset_profile: balanced
+preset_memory: true
+preset_emotion: true
+preset_gematria: true
+preset_rewrite: true
+preset_banner: false
+module_enabled:
+  help: true
+  maat_reflection: true
+  maat_spirit: true
+  identity: true
+  cci_engine: true
+  emotion: true
+  maat_engine: true
+  maat_principles: true
+  maat_thinking: true
+  plp_anti_hallu: true
+  rewrite_loop: true
+  super_memory: true
+  maat_value_core: true
+  maat_reality_layer: true
+module_order:
+- help
+- maat_reality_layer
+- super_memory
+- maat_engine
+- cci_engine
+- plp_anti_hallu
+- emotion
+- rewrite_loop
+- maat_value_core
+- maat_principles
+- identity
+- maat_thinking
+- maat_spirit
+- maat_reflection
+show_banner: false
+max_loader_events: 200
+spirit_enabled: true
+spirit_mode: standard
+spirit_once: true
+spirit_language: auto
+spirit_use_emojis: true
+reflection_enabled: true
+reflection_banner: true
+reflection_mode: auto
+reflection_force_codeblock: true
+identity_enabled: true
+identity_name: MAAT-KI
+identity_mode: balanced
+identity_once: true
+memory_enabled: true
+memory_autostore: true
+memory_autorecall: true
+emotion_enabled: true
+emotion_inject: true
+emotion_memory: true
+emotion_trend_enabled: true
+gematria_enabled: true
+gematria_auto_trigger: true
+gematria_inject: true
+gematria_store_memory: true
+rewrite_enabled: true
+rewrite_inject: true
+maat_thinking: true
+maat_core_enabled: true
+maat_value_enabled: true
+plp_enabled: true
+maat_mode: deep
+respect_hard_constant: true
+respect_hard: true
+respect_min: 0.6
+respect_refusal_threshold: 0.28
+cci_enabled: true
+cci_warn_threshold: 0.42
+cci_harden_threshold: 0.65
+after_reflection_enabled: true
+emotion_guidance_weighting: true
+maat_value_inject: true
+rewrite_maat_threshold: 7.2
+plp_threshold_warn: 55.0
+plp_threshold_harden: 40.0
+rewrite_mode: balanced
+rewrite_show_banner: false
+rewrite_cci_high: 0.35
+rewrite_cci_low: 0.2
+rewrite_hrs_high: 0.75
+rewrite_hrs_mid: 0.55
+emotion_mode: full
+emotion_once: false
+emotion_language: auto
+cci_kappa: 0.5
+cci_show_banner: false
+engine_enabled: true
+engine_show_debug: false
+principles_enabled: true
+principles_mode: standard
+principles_once: true
+maat_thinking_mode: true
+maat_thinking_target: 10.0
+maat_thinking_depth: deep
+antihallu_enabled: true
+antihallu_mode: soften
+antihallu_show_banner: false
+antihallu_soften_threshold: 0.55
+antihallu_strict_threshold: 0.85
+supermem_enabled: true
+supermem_autostore: true
+supermem_autorecall: true
+supermem_debug: false
+supermem_top_k: 5
+supermem_min_score: 0.15
+supermem_show_source: true
+supermem_max_episodic: 500
+supermem_max_semantic: 300
+supermem_max_keyword: 200
+supermem_dream_on_load: true
+supermem_dream_hours: 24
+supermem_allow_model_saves: true
+maat_core_mode: standard
+reality_enabled: true
+reality_inject_time: true
+reality_show_banner: false
