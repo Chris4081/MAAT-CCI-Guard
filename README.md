@@ -1,4 +1,4 @@
-# MAAT CCI Guard (MAAT-KI Plugin + Benchmark - text generation web ui
+# MAAT CCI Guard (MAAT-KI Plugin + Benchmark - text generation web ui)
 Lightweight framework for analyzing structural consistency and output behavior in local LLMs.
 This repository combines:
 - **MAAT CCI Guard** → runtime prompt analysis (conflict detection + drift)
